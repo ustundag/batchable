@@ -1,4 +1,4 @@
-# Batchable Spring Boot 3.x Starter
+# Batchable Spring Boot
 
 An AOP-based batch processing library for Spring Boot 3.x applications that automatically collects method parameters and processes them in batches based on size or time triggers.
 
@@ -50,7 +50,7 @@ public class UserService {
 }
 ```
 
-### 3. Annotation Parameters
+### 2. Annotation Parameters
 
 The `@Batchable` annotation supports the following parameters:
 
@@ -80,50 +80,48 @@ The `@Batchable` annotation supports the following parameters:
 
 ## Example Use Cases
 
-### Batch Database Inserts
+### Batch Database Deletes
+
+Batch processing is especially critical for DELETE operations. Processing deletes individually vs. in batches can result in **10-100x performance differences**.
+
+**Why Batch Deletes Are Essential:**
+
+1. **Network Round-Trips**
+2. **Execution Plan Overhead**
+3. **Transaction Management**
+4. **Lock/Contention**
+5. **Log Growth**
+
+**Performance Comparison:**
+- **Row-by-row DELETE**: 5-30 seconds for 10,000 rows
+- **Set-based DELETE**: 200-700 milliseconds for 10,000 rows
+
+**Example Implementation:**
 
 ```java
 @Component
 public class OrderService {
     
     @Batchable(
-        targetMethod = "saveOrdersBatch",
-        size = 50,
-        triggerAfterMinutes = 2
-    )
-    public void createOrder(Order order) {
-        // Individual order creation is intercepted
-    }
-    
-    public void saveOrdersBatch(List<Order> orders) {
-        // Batch insert for better performance
-        orderRepository.saveAll(orders);
-        log.info("Saved {} orders in batch", orders.size());
-    }
-}
-```
-
-### Batch API Calls
-
-```java
-@Component
-public class NotificationService {
-    
-    @Batchable(
-        targetMethod = "sendNotificationsBatch",
-        size = 20,
+        targetMethod = "deleteOrdersBatch",
+        size = 1000,
         triggerAfterMinutes = 1
     )
-    public void sendNotification(Notification notification) {
-        // Individual notification is queued
+    public void deleteOrder(Long orderId) {
+        // Individual delete is intercepted and batched
     }
     
-    public void sendNotificationsBatch(List<Notification> notifications) {
-        // Send all notifications in a single API call
-        notificationClient.sendBatch(notifications);
+    public void deleteOrdersBatch(List<Long> orderIds) {
+        // Batch delete using IN clause
     }
 }
 ```
+
+**Best Practices:**
+- For batches up to ~1,000 IDs: Use `IN` clause (`DELETE FROM Orders WHERE Id IN (...)`)
+- For larger batches: Use temporary table + JOIN approach:
+
+**Key Takeaway:** "Set-based operations always beat row-by-row" - this is the fundamental philosophy of all RDBMS engines (SQL Server, PostgreSQL, Oracle, MySQL). Batch processing aligns perfectly with this principle.
 
 ## Thread Safety
 
