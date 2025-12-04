@@ -14,12 +14,6 @@ This is particularly useful for scenarios like:
 - Batch file processing
 - Any operation that benefits from processing multiple items together
 
-## Requirements
-
-- Java 21 or higher
-- Spring Boot 3x or higher
-- Spring AOP (automatically included)
-
 ## Usage
 
 ### 1. Annotate Your Methods
@@ -28,25 +22,20 @@ Use the `@Batchable` annotation on methods that should collect parameters for ba
 
 ```java
 @Component
-public class UserService {
-    
-    @Batchable(
-        targetMethod = "addUsers",
-        size = 10,
-        triggerAfterMinutes = 5
-    )
-    public void addUser(User user) {
-        // This method will be intercepted
-        // Parameters are collected and processed in batches
-    }
-    
-    public void addUsers(List<User> users) {
-        // This method will be called with a batch of users
-        // when either:
-        // - 10 users have been collected (size trigger)
-        // - 5 minutes have passed since the first user was added (time trigger)
-        userRepository.saveAll(users);
-    }
+public class OrderService {
+
+  @Batchable(
+          targetMethod = "deleteOrders",
+          size = 1000,
+          timeout = 1
+  )
+  public void deleteOrder(Long orderId) {
+    // Individual delete is intercepted and batched
+  }
+
+  public void deleteOrders(List<Long> orderIds) {
+    // Batch delete using IN clause
+  }
 }
 ```
 
@@ -61,36 +50,34 @@ The `@Batchable` annotation supports the following parameters:
   
 - **`size`** (optional, default: 10): The number of items to collect before triggering batch processing.
 
-- **`triggerAfterMinutes`** (optional, default: 5): The number of minutes to wait before triggering batch processing based on time.
+- **`timeout`** (optional, default: 5): The number of minutes to wait before triggering batch processing based on time.
 
 ### Important Constraints
 
 1. **Method Signature**: The annotated method must accept exactly one parameter.
 2. **Target Method**: The target method must be public and accept a `List<T>` parameter.
 3. **Same Class**: The target method must be in the same class as the annotated method.
-4. **Validation**: At least one of `size` or `triggerAfterMinutes` must be greater than zero.
+4. **Validation**: At least one of `size` or `timeout` must be greater than zero.
 
 ## How It Works
 
 1. **Interception**: When a method annotated with `@Batchable` is called, the AOP aspect intercepts the call.
 2. **Caching**: The method parameter is added to an in-memory cache associated with that method.
 3. **Size-Based Triggering**: If the cache reaches the specified `size`, the batch is immediately processed.
-4. **Time-Based Triggering**: A scheduled task runs every minute to check for batches that have exceeded the `triggerAfterMinutes` threshold.
+4. **Time-Based Triggering**: A scheduled task runs every minute to check for batches that have exceeded the `timeout` threshold.
 5. **Batch Processing**: When triggered, all collected parameters are passed as a `List` to the target method.
 
-## Example Use Cases
-
-### Batch Database Deletes
+## Motivation
 
 Batch processing is especially critical for DELETE operations. Processing deletes individually vs. in batches can result in **10-100x performance differences**.
 
 **Why Batch Deletes Are Essential:**
 
-1. **Network Round-Trips**
-2. **Execution Plan Overhead**
-3. **Transaction Management**
-4. **Lock/Contention**
-5. **Log Growth**
+1. Network Round-Trips
+2. Execution Plan Overhead
+3. Transaction Management
+4. Lock/Contention
+5. Log Growth
 
 **Performance Comparison:**
 - **Row-by-row DELETE**: 5-30 seconds for 10,000 rows
@@ -103,15 +90,15 @@ Batch processing is especially critical for DELETE operations. Processing delete
 public class OrderService {
     
     @Batchable(
-        targetMethod = "deleteOrdersBatch",
+        targetMethod = "deleteOrders",
         size = 1000,
-        triggerAfterMinutes = 1
+        timeout = 1
     )
     public void deleteOrder(Long orderId) {
         // Individual delete is intercepted and batched
     }
     
-    public void deleteOrdersBatch(List<Long> orderIds) {
+    public void deleteOrders(List<Long> orderIds) {
         // Batch delete using IN clause
     }
 }
@@ -122,26 +109,3 @@ public class OrderService {
 - For larger batches: Use temporary table + JOIN approach:
 
 **Key Takeaway:** "Set-based operations always beat row-by-row" - this is the fundamental philosophy of all RDBMS engines (SQL Server, PostgreSQL, Oracle, MySQL). Batch processing aligns perfectly with this principle.
-
-## Thread Safety
-
-The library uses thread-safe data structures (`ConcurrentHashMap`) and locking mechanisms (`ReentrantLock`) to ensure safe concurrent access to batch caches.
-
-## Validation
-
-The library automatically validates all `@Batchable` annotations at application startup:
-
-- Ensures target methods exist
-- Validates method signatures
-- Checks that target methods are public
-- Verifies that at least one trigger condition is valid
-
-If validation fails, the application will fail to start with a clear error message.
-
-## Limitations
-
-- Methods annotated with `@Batchable` must accept exactly one parameter
-- The annotated method returns `null` (batch processing is asynchronous)
-- Batch processing is in-memory only (not persistent across restarts)
-- Target methods must be in the same class as the annotated method
-

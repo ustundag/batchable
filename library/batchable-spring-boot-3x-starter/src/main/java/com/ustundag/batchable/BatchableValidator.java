@@ -77,14 +77,14 @@ public class BatchableValidator implements ApplicationListener<ContextRefreshedE
         String className = bean.getClass().getName();
         String methodName = annotatedMethod.getName();
         int size = batchable.size();
-        int triggerAfterMinutes = batchable.triggerAfterMinutes();
+        int timeout = batchable.timeout();
 
-        if (size <= 0 || triggerAfterMinutes <= 0) {
+        if (size <= 0 || timeout <= 0) {
             throw new IllegalStateException(
                     String.format("@Batchable validation failed for method %s.%s: " +
-                                    "At least one of 'size' or 'triggerAfterMinutes' must be greater than zero. " +
-                                    "Current values: size=%d, triggerAfterMinutes=%d",
-                            className, methodName, size, triggerAfterMinutes));
+                                    "At least one of 'size' or 'timeout' must be greater than zero. " +
+                                    "Current values: size=%d, timeout=%d",
+                            className, methodName, size, timeout));
         }
 
         validateTargetMethod(bean, annotatedMethod, batchable);

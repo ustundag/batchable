@@ -13,6 +13,6 @@ public @interface Batchable {
 
     int size() default 10;
 
-    int triggerAfterMinutes() default 5;
+    int timeout() default 5;
 }
 

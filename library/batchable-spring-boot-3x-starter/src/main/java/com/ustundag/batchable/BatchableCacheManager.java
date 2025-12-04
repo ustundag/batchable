@@ -24,7 +24,7 @@ public class BatchableCacheManager {
         lock.lock();
         try {
             int batchSize = batchable.size();
-            int cronMinutes = batchable.triggerAfterMinutes();
+            int cronMinutes = batchable.timeout();
             String batchMethodName = batchable.targetMethod();
 
             BatchCacheEntry cacheEntry = cache.computeIfAbsent(methodKey, k ->
